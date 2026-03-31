@@ -1,0 +1,2164 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Conformal Navigation — Multi-Agent Uncertainty Demo</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+  /* ===================== RESET & BASE ===================== */
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg:        #09090f;
+    --surface:   #11111c;
+    --border:    #1e1e2e;
+    --border2:   #2a2a3d;
+    --text:      #e2e2f0;
+    --muted:     #6b6b8a;
+    --blue:      #4f9cf9;
+    --blue-dim:  rgba(79,156,249,0.12);
+    --blue-glow: rgba(79,156,249,0.25);
+    --red:       #f96060;
+    --red-dim:   rgba(249,96,96,0.12);
+    --red-glow:  rgba(249,96,96,0.25);
+    --green:     #52d48a;
+    --yellow:    #f9c74f;
+    --radius:    12px;
+    --cell: 46px;
+  }
+
+  html, body {
+    height: 100%;
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Syne', sans-serif;
+    overflow-x: hidden;
+  }
+
+  /* ===================== LAYOUT ===================== */
+  .app {
+    min-height: 100vh;
+    display: grid;
+    grid-template-rows: auto 1fr;
+  }
+
+  header {
+    padding: 28px 40px 0;
+    display: flex;
+    align-items: flex-end;
+    gap: 32px;
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 0;
+  }
+
+  .logo {
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--muted);
+    padding-bottom: 20px;
+  }
+
+  .tabs {
+    display: flex;
+    gap: 2px;
+  }
+
+  .tab {
+    padding: 10px 20px;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--muted);
+    cursor: pointer;
+    border: none;
+    background: none;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -1px;
+    transition: all 0.2s;
+    font-family: 'Syne', sans-serif;
+    letter-spacing: 0.02em;
+  }
+
+  .tab:hover { color: var(--text); }
+  .tab.active { color: var(--blue); border-bottom-color: var(--blue); }
+
+  main {
+    display: none;
+    padding: 32px 40px;
+    gap: 24px;
+  }
+  main.active { display: grid; }
+
+  /* ===================== SIM TAB LAYOUT ===================== */
+  #tab-sim {
+    grid-template-columns: 1fr 340px;
+    grid-template-rows: auto 1fr;
+    align-items: start;
+  }
+
+  #tab-theory {
+    grid-template-columns: 1fr 1fr;
+    max-width: 1100px;
+  }
+
+  #tab-code {
+    grid-template-columns: 1fr;
+    max-width: 900px;
+  }
+
+  /* ===================== CARDS ===================== */
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 24px;
+  }
+
+  .card-title {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 20px;
+  }
+
+  /* ===================== GRID WORLD ===================== */
+  .grid-wrapper {
+    grid-column: 1;
+    grid-row: 1 / 3;
+  }
+
+  .grid-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 20px;
+  }
+
+  .grid-title {
+    font-size: 18px;
+    font-weight: 800;
+  }
+
+  .step-badge {
+    font-family: 'DM Mono', monospace;
+    font-size: 13px;
+    color: var(--muted);
+    background: var(--border);
+    padding: 4px 12px;
+    border-radius: 20px;
+  }
+
+  .grid-canvas-wrap {
+    position: relative;
+    display: inline-block;
+  }
+
+  canvas#gridCanvas {
+    display: block;
+    border-radius: 10px;
+    border: 1px solid var(--border);
+  }
+
+  /* ===================== CONTROLS ===================== */
+  .controls {
+    grid-column: 1;
+    grid-row: 3;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin-top: 16px;
+    flex-wrap: wrap;
+  }
+
+  .btn {
+    font-family: 'Syne', sans-serif;
+    font-weight: 700;
+    font-size: 13px;
+    letter-spacing: 0.05em;
+    padding: 10px 22px;
+    border-radius: 8px;
+    border: none;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+
+  .btn-primary {
+    background: var(--blue);
+    color: #fff;
+  }
+  .btn-primary:hover { filter: brightness(1.1); }
+  .btn-primary:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  .btn-ghost {
+    background: var(--border);
+    color: var(--text);
+  }
+  .btn-ghost:hover { background: var(--border2); }
+
+  .slider-wrap {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 13px;
+    color: var(--muted);
+  }
+
+  input[type=range] {
+    -webkit-appearance: none;
+    width: 120px;
+    height: 4px;
+    border-radius: 2px;
+    background: var(--border2);
+    outline: none;
+  }
+  input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 14px; height: 14px;
+    border-radius: 50%;
+    background: var(--blue);
+    cursor: pointer;
+  }
+
+  .alpha-val {
+    font-family: 'DM Mono', monospace;
+    color: var(--text);
+    font-size: 13px;
+    min-width: 32px;
+  }
+
+  /* ===================== RIGHT PANEL ===================== */
+  .right-panel {
+    grid-column: 2;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  /* ===================== STAT CARDS ===================== */
+  .stats-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+  }
+
+  .stat {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 14px;
+  }
+
+  .stat-label {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 6px;
+  }
+
+  .stat-value {
+    font-family: 'DM Mono', monospace;
+    font-size: 22px;
+    font-weight: 500;
+    color: var(--text);
+  }
+
+  .stat-value.blue { color: var(--blue); }
+  .stat-value.red  { color: var(--red); }
+  .stat-value.green { color: var(--green); }
+
+  .stat-sub {
+    font-size: 11px;
+    color: var(--muted);
+    margin-top: 2px;
+  }
+
+  /* ===================== AGENT CARDS ===================== */
+  .agent-card {
+    border-radius: 10px;
+    padding: 16px;
+    border: 1px solid;
+  }
+
+  .agent-card.blue {
+    background: var(--blue-dim);
+    border-color: rgba(79,156,249,0.2);
+  }
+
+  .agent-card.red {
+    background: var(--red-dim);
+    border-color: rgba(249,96,96,0.2);
+  }
+
+  .agent-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 12px;
+  }
+
+  .agent-dot {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+  }
+
+  .agent-name {
+    font-weight: 700;
+    font-size: 14px;
+  }
+
+  .agent-pos {
+    font-family: 'DM Mono', monospace;
+    font-size: 12px;
+    color: var(--muted);
+    margin-left: auto;
+  }
+
+  .agent-rows {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .agent-row {
+    display: flex;
+    justify-content: space-between;
+    font-size: 12px;
+    color: var(--muted);
+  }
+
+  .agent-row span:last-child {
+    font-family: 'DM Mono', monospace;
+    color: var(--text);
+  }
+
+  /* Coverage bar */
+  .cov-bar-wrap {
+    margin-top: 10px;
+    height: 4px;
+    background: var(--border2);
+    border-radius: 2px;
+    overflow: hidden;
+  }
+
+  .cov-bar {
+    height: 100%;
+    border-radius: 2px;
+    transition: width 0.3s;
+  }
+
+  /* ===================== MINI CHARTS ===================== */
+  canvas.mini-chart {
+    display: block;
+    width: 100%;
+  }
+
+  /* ===================== LOG ===================== */
+  .log-wrap {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 12px;
+    height: 130px;
+    overflow-y: auto;
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    color: var(--muted);
+  }
+
+  .log-wrap::-webkit-scrollbar { width: 4px; }
+  .log-wrap::-webkit-scrollbar-track { background: transparent; }
+  .log-wrap::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 2px; }
+
+  .log-line { line-height: 1.8; }
+  .log-line .t { color: var(--muted); margin-right: 8px; }
+  .log-line .msg { color: var(--text); }
+  .log-line .warn { color: var(--yellow); }
+  .log-line .ok   { color: var(--green); }
+
+  /* ===================== THEORY TAB ===================== */
+  .theory-block {
+    margin-bottom: 24px;
+  }
+
+  .theory-block h3 {
+    font-size: 15px;
+    font-weight: 700;
+    margin-bottom: 8px;
+    color: var(--text);
+  }
+
+  .theory-block p {
+    font-size: 13px;
+    line-height: 1.7;
+    color: var(--muted);
+    font-family: 'DM Mono', monospace;
+  }
+
+  .formula-box {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 14px 18px;
+    margin: 12px 0;
+    font-family: 'DM Mono', monospace;
+    font-size: 13px;
+    color: var(--blue);
+    letter-spacing: 0.03em;
+  }
+
+  .pipeline {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    margin: 16px 0;
+  }
+
+  .pipeline-step {
+    display: flex;
+    align-items: flex-start;
+    gap: 14px;
+    padding: 12px 0;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .pipeline-step:last-child { border-bottom: none; }
+
+  .pipe-num {
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--blue);
+    background: var(--blue-dim);
+    border-radius: 4px;
+    padding: 2px 7px;
+    margin-top: 2px;
+    flex-shrink: 0;
+  }
+
+  .pipe-text strong {
+    display: block;
+    font-size: 13px;
+    font-weight: 700;
+    margin-bottom: 3px;
+  }
+
+  .pipe-text p {
+    font-size: 12px;
+    color: var(--muted);
+    font-family: 'DM Mono', monospace;
+    line-height: 1.6;
+  }
+
+  /* ===================== CODE TAB ===================== */
+  .code-block {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 20px;
+    overflow-x: auto;
+    font-family: 'DM Mono', monospace;
+    font-size: 12px;
+    line-height: 1.8;
+    color: var(--text);
+    margin: 12px 0;
+  }
+
+  .code-block .kw  { color: #c792ea; }
+  .code-block .fn  { color: var(--blue); }
+  .code-block .cm  { color: var(--muted); }
+  .code-block .str { color: var(--green); }
+  .code-block .num { color: var(--yellow); }
+
+  /* ===================== COMPARE TAB ===================== */
+  #tab-compare {
+    grid-template-columns: 1fr;
+    max-width: 1200px;
+  }
+
+  .compare-grids {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+    margin-bottom: 4px;
+  }
+
+  .compare-grid-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .compare-panel-label {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    padding: 6px 12px;
+    border-radius: 6px;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .compare-panel-label.baseline {
+    background: rgba(249,199,79,0.12);
+    color: #f9c74f;
+    border: 1px solid rgba(249,199,79,0.2);
+  }
+
+  .compare-panel-label.conformal {
+    background: var(--blue-dim);
+    color: var(--blue);
+    border: 1px solid rgba(79,156,249,0.2);
+  }
+
+  .compare-canvas-wrap canvas {
+    display: block;
+    border-radius: 10px;
+    border: 1px solid var(--border);
+  }
+
+  .compare-step-info {
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    color: var(--muted);
+    margin-top: 4px;
+    height: 18px;
+  }
+
+  /* Metrics table */
+  .metrics-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12px;
+  }
+
+  .metrics-table th {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--muted);
+    text-align: left;
+    padding: 8px 14px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .metrics-table th:not(:first-child) { text-align: center; }
+
+  .metrics-table td {
+    padding: 9px 14px;
+    color: var(--text);
+    font-family: 'DM Mono', monospace;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .metrics-table td:not(:first-child) { text-align: center; }
+
+  .metrics-table tr:last-child td { border-bottom: none; }
+  .metrics-table tr:nth-child(even) td { background: rgba(255,255,255,0.015); }
+
+  .metrics-table td.metric-name {
+    font-family: 'Syne', sans-serif;
+    font-size: 12px;
+    color: var(--text);
+    font-weight: 600;
+  }
+
+  .badge-winner {
+    display: inline-block;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    padding: 2px 8px;
+    border-radius: 4px;
+  }
+
+  .badge-winner.conf {
+    background: var(--blue-dim);
+    color: var(--blue);
+    border: 1px solid rgba(79,156,249,0.25);
+  }
+
+  .badge-winner.base {
+    background: rgba(249,199,79,0.1);
+    color: #f9c74f;
+    border: 1px solid rgba(249,199,79,0.2);
+  }
+
+  .badge-winner.tie {
+    background: rgba(107,107,138,0.12);
+    color: var(--muted);
+    border: 1px solid var(--border2);
+  }
+
+  .val-better { color: var(--green); }
+  .val-worse  { color: var(--red); }
+  .val-na     { color: var(--muted); }
+
+  .mode-btn {
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    font-weight: 500;
+    padding: 5px 12px;
+    border-radius: 6px;
+    border: 1px solid var(--border2);
+    background: transparent;
+    color: var(--muted);
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .mode-btn:hover { color: var(--text); border-color: var(--text); }
+  .mode-btn.active {
+    background: var(--blue-dim);
+    color: var(--blue);
+    border-color: rgba(79,156,249,0.35);
+  }
+
+  .compare-controls {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin-bottom: 20px;
+    flex-wrap: wrap;
+  }
+
+  ::-webkit-scrollbar { width: 6px; }
+  ::-webkit-scrollbar-track { background: var(--bg); }
+  ::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 3px; }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <header>
+    <div class="logo">Conformal Navigation</div>
+    <nav class="tabs">
+      <button class="tab active" onclick="switchTab('sim')">Simulation</button>
+      <button class="tab" onclick="switchTab('compare')">Safety Comparison</button>
+      <button class="tab" onclick="switchTab('theory')">How It Works</button>
+      <button class="tab" onclick="switchTab('code')">Architecture</button>
+    </nav>
+  </header>
+
+  <!-- ==================== SIMULATION TAB ==================== -->
+  <main id="tab-sim" class="active">
+
+    <!-- LEFT: Grid -->
+    <div class="grid-wrapper">
+      <div class="grid-header">
+        <div class="grid-title">Grid World</div>
+        <div class="step-badge" id="stepBadge">Step 0 / 50</div>
+      </div>
+      <div class="grid-canvas-wrap">
+        <canvas id="gridCanvas"></canvas>
+      </div>
+      <div class="controls" style="margin-top:16px;">
+        <button class="btn btn-primary" id="btnPlay" onclick="togglePlay()">▶ Run</button>
+        <button class="btn btn-ghost" onclick="resetSim()">↺ Reset</button>
+        <div class="slider-wrap">
+          Speed
+          <input type="range" id="speedSlider" min="100" max="900" value="500" oninput="updateSpeed(this.value)">
+        </div>
+        <div class="slider-wrap">
+          α =
+          <input type="range" id="alphaSlider" min="1" max="40" value="10" oninput="updateAlpha(this.value)">
+          <span class="alpha-val" id="alphaVal">0.10</span>
+        </div>
+        <div class="slider-wrap" style="gap:8px;">
+          <span>Mode</span>
+          <button class="mode-btn active" id="simModeRandom" onclick="setSimMode('random')">Random</button>
+          <button class="mode-btn" id="simModeClassic" onclick="setSimMode('classic')">Classic</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- RIGHT: Stats + Agents + Charts -->
+    <div class="right-panel">
+
+      <!-- Stats grid -->
+      <div class="card" style="padding:18px;">
+        <div class="card-title">Simulation Stats</div>
+        <div class="stats-grid">
+          <div class="stat">
+            <div class="stat-label">Collisions</div>
+            <div class="stat-value red" id="statCollisions">0</div>
+            <div class="stat-sub">total</div>
+          </div>
+          <div class="stat">
+            <div class="stat-label">Coverage</div>
+            <div class="stat-value green" id="statCoverage">—</div>
+            <div class="stat-sub">target: <span id="covTarget">90%</span></div>
+          </div>
+          <div class="stat">
+            <div class="stat-label">Avg Set Size</div>
+            <div class="stat-value blue" id="statSetSize">—</div>
+            <div class="stat-sub">cells / 100</div>
+          </div>
+          <div class="stat">
+            <div class="stat-label">Threshold q</div>
+            <div class="stat-value" id="statQ">—</div>
+            <div class="stat-sub">cutoff prob</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Agent A -->
+      <div class="agent-card blue">
+        <div class="agent-header">
+          <div class="agent-dot" style="background:#4f9cf9;box-shadow:0 0 6px #4f9cf9;"></div>
+          <div class="agent-name">Agent A</div>
+          <div class="agent-pos" id="posA">(0, 0)</div>
+        </div>
+        <div class="agent-rows">
+          <div class="agent-row"><span>Goal</span><span id="goalA">(9, 9)</span></div>
+          <div class="agent-row"><span>Set size</span><span id="setSizeA">—</span></div>
+          <div class="agent-row"><span>Coverage</span><span id="covA">—</span></div>
+          <div class="agent-row"><span>Last action</span><span id="actionA">—</span></div>
+        </div>
+        <div class="cov-bar-wrap">
+          <div class="cov-bar" id="covBarA" style="background:#4f9cf9;width:0%;"></div>
+        </div>
+      </div>
+
+      <!-- Agent B -->
+      <div class="agent-card red">
+        <div class="agent-header">
+          <div class="agent-dot" style="background:#f96060;box-shadow:0 0 6px #f96060;"></div>
+          <div class="agent-name">Agent B</div>
+          <div class="agent-pos" id="posB">(9, 9)</div>
+        </div>
+        <div class="agent-rows">
+          <div class="agent-row"><span>Goal</span><span id="goalB">(0, 0)</span></div>
+          <div class="agent-row"><span>Set size</span><span id="setSizeB">—</span></div>
+          <div class="agent-row"><span>Coverage</span><span id="covB">—</span></div>
+          <div class="agent-row"><span>Last action</span><span id="actionB">—</span></div>
+        </div>
+        <div class="cov-bar-wrap">
+          <div class="cov-bar" id="covBarB" style="background:#f96060;width:0%;"></div>
+        </div>
+      </div>
+
+      <!-- Set size chart -->
+      <div class="card" style="padding:18px;">
+        <div class="card-title">Set Size Over Time</div>
+        <canvas class="mini-chart" id="sizeChart" height="80"></canvas>
+      </div>
+
+      <!-- Coverage chart -->
+      <div class="card" style="padding:18px;">
+        <div class="card-title">Running Coverage</div>
+        <canvas class="mini-chart" id="covChart" height="70"></canvas>
+      </div>
+
+      <!-- Event log -->
+      <div class="card" style="padding:18px;">
+        <div class="card-title">Event Log</div>
+        <div class="log-wrap" id="eventLog"></div>
+      </div>
+
+    </div><!-- end right panel -->
+  </main>
+
+  <!-- ==================== COMPARE TAB ==================== -->
+  <main id="tab-compare" style="display:none;">
+    <div style="grid-column:1;">
+
+      <!-- Controls -->
+      <div class="compare-controls">
+        <button class="btn btn-primary" id="btnCompare" onclick="toggleCompare()">▶ Run Comparison</button>
+        <button class="btn btn-ghost" onclick="resetCompare()">↺ Reset</button>
+        <div class="slider-wrap">
+          Speed
+          <input type="range" id="cmpSpeedSlider" min="100" max="900" value="500" oninput="cmpSpeed=parseInt(this.value)">
+        </div>
+        <div class="slider-wrap">
+          α =
+          <input type="range" id="cmpAlphaSlider" min="1" max="40" value="10" oninput="updateCmpAlpha(this.value)">
+          <span class="alpha-val" id="cmpAlphaVal">0.10</span>
+        </div>
+        <div class="slider-wrap" style="gap:8px;">
+          <span>Mode</span>
+          <button class="mode-btn" id="cmpModeRandom" onclick="setCmpMode('random')">Random</button>
+          <button class="mode-btn active" id="cmpModeCrossing" onclick="setCmpMode('crossing')">Crossing</button>
+          <button class="mode-btn" id="cmpModeClassic" onclick="setCmpMode('classic')">Classic</button>
+        </div>
+        <div class="step-badge" id="cmpStepBadge">Step 0 / 50</div>
+        <div class="slider-wrap" id="cmpExamplePicker" style="gap:6px;display:none;">
+          <span style="color:var(--muted);font-size:13px;">Example</span>
+          <button class="mode-btn active" id="cmpEx0" onclick="selectCrossingExample(0)">1</button>
+          <button class="mode-btn" id="cmpEx1" onclick="selectCrossingExample(1)">2</button>
+          <button class="mode-btn" id="cmpEx2" onclick="selectCrossingExample(2)">3</button>
+          <button class="mode-btn" id="cmpEx3" onclick="selectCrossingExample(3)">4</button>
+          <button class="mode-btn" id="cmpEx4" onclick="selectCrossingExample(4)">5</button>
+        </div>
+      </div>
+
+      <!-- Side-by-side grids -->
+      <div class="compare-grids">
+        <div class="compare-grid-panel">
+          <div class="compare-panel-label baseline">⚡ Baseline — greedy, no uncertainty</div>
+          <div class="compare-canvas-wrap">
+            <canvas id="baseCanvas"></canvas>
+          </div>
+          <div class="compare-step-info" id="baseInfo">—</div>
+        </div>
+        <div class="compare-grid-panel">
+          <div class="compare-panel-label conformal">◈ Conformal — minimax + prediction sets</div>
+          <div class="compare-canvas-wrap">
+            <canvas id="confCanvas"></canvas>
+          </div>
+          <div class="compare-step-info" id="confInfo">—</div>
+        </div>
+      </div>
+
+      <!-- Metrics table -->
+      <div class="card" style="margin-top:20px;">
+        <div class="card-title">Safety Metrics</div>
+        <table class="metrics-table" id="metricsTable">
+          <thead>
+            <tr>
+              <th>Metric</th>
+              <th>Baseline</th>
+              <th>Conformal</th>
+              <th>Winner</th>
+            </tr>
+          </thead>
+          <tbody id="metricsBody">
+            <tr><td class="metric-name">Collisions</td><td id="m-base-coll">—</td><td id="m-conf-coll">—</td><td id="m-win-coll">—</td></tr>
+            <tr><td class="metric-name">Near-misses (dist ≤ 1)</td><td id="m-base-near">—</td><td id="m-conf-near">—</td><td id="m-win-near">—</td></tr>
+            <tr><td class="metric-name">A: final dist to goal</td><td id="m-base-dista">—</td><td id="m-conf-dista">—</td><td id="m-win-dista">—</td></tr>
+            <tr><td class="metric-name">B: final dist to goal</td><td id="m-base-distb">—</td><td id="m-conf-distb">—</td><td id="m-win-distb">—</td></tr>
+            <tr><td class="metric-name">Coverage A (target <span id="cmpCovTarget">90%</span>)</td><td class="val-na">N/A</td><td id="m-conf-cova">—</td><td>—</td></tr>
+            <tr><td class="metric-name">Coverage B</td><td class="val-na">N/A</td><td id="m-conf-covb">—</td><td>—</td></tr>
+            <tr><td class="metric-name">Avg prediction set A</td><td class="val-na">N/A</td><td id="m-conf-seta">—</td><td>—</td></tr>
+            <tr><td class="metric-name">Avg prediction set B</td><td class="val-na">N/A</td><td id="m-conf-setb">—</td><td>—</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+    </div>
+  </main>
+
+  <!-- ==================== THEORY TAB ==================== -->
+  <main id="tab-theory" style="display:none;">
+    <div class="card" style="grid-column:1;">
+      <div class="card-title">The Full Pipeline</div>
+      <div class="pipeline">
+        <div class="pipeline-step">
+          <div class="pipe-num">01</div>
+          <div class="pipe-text">
+            <strong>Environment + Noise</strong>
+            <p>Each agent gets a noisy observation of the other's true position. Noise is Gaussian with σ=1.5 cells. This is the source of all uncertainty in the system.</p>
+          </div>
+        </div>
+        <div class="pipeline-step">
+          <div class="pipe-num">02</div>
+          <div class="pipe-text">
+            <strong>Classifier (Logistic Regression)</strong>
+            <p>A model trained on 20,000 (observation → true position) pairs. Takes a noisy (obs_x, obs_y) and outputs a softmax probability distribution over all 100 grid cells.</p>
+          </div>
+        </div>
+        <div class="pipeline-step">
+          <div class="pipe-num">03</div>
+          <div class="pipe-text">
+            <strong>Calibration (Conformity Scores)</strong>
+            <p>On 4,000 held-out examples, record the probability given to the correct true label. This fingerprints the model's real-world accuracy before any test-time predictions.</p>
+          </div>
+        </div>
+        <div class="pipeline-step">
+          <div class="pipe-num">04</div>
+          <div class="pipe-text">
+            <strong>Threshold q (Quantile)</strong>
+            <p>From the calibration scores, compute q = α-th percentile. This is the cutoff: include any cell with probability ≥ q in the prediction set.</p>
+          </div>
+        </div>
+        <div class="pipeline-step">
+          <div class="pipe-num">05</div>
+          <div class="pipe-text">
+            <strong>Prediction Set (Coverage Guarantee)</strong>
+            <p>At test time: C(obs) = all cells i where P(i | obs) ≥ q. The guarantee: P(true position ∈ C) ≥ 1−α. Proven under exchangeability.</p>
+          </div>
+        </div>
+        <div class="pipeline-step">
+          <div class="pipe-num">06</div>
+          <div class="pipe-text">
+            <strong>Minimax Policy</strong>
+            <p>For each possible action, compute the worst-case cost assuming the other agent is at the worst position in the prediction set. Pick the action that minimizes worst-case cost.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div style="display:flex;flex-direction:column;gap:16px;">
+      <div class="card">
+        <div class="card-title">Key Formulas</div>
+        <div class="theory-block">
+          <h3>Conformity Score</h3>
+          <div class="formula-box">s_i = f(obs_i)[y_i]</div>
+          <p>The probability the classifier assigned to the true label on calibration example i.</p>
+        </div>
+        <div class="theory-block">
+          <h3>Threshold (finite sample correction)</h3>
+          <div class="formula-box">q = Quantile(scores, ⌈(n+1)·α⌉ / n)</div>
+          <p>The (n+1) correction makes coverage exact rather than approximate for finite calibration sets.</p>
+        </div>
+        <div class="theory-block">
+          <h3>Prediction Set</h3>
+          <div class="formula-box">C(obs) = &#123; i : f(obs)[i] ≥ q &#125;</div>
+          <p>All classes whose probability meets or exceeds the threshold. Guaranteed to contain the true label with probability ≥ 1−α.</p>
+        </div>
+        <div class="theory-block">
+          <h3>Minimax Policy</h3>
+          <div class="formula-box">a* = argmin_a [ max_&#123;p ∈ C&#125; cost(a, p) ]</div>
+          <p>Choose the action whose worst-case outcome (over all positions in the uncertainty set) is least bad. Conservative but provably safe.</p>
+        </div>
+        <div class="theory-block">
+          <h3>Coverage Guarantee</h3>
+          <div class="formula-box">P(y_test ∈ C(obs_test)) ≥ 1 − α</div>
+          <p>Proven under exchangeability of calibration and test data. Not a heuristic — a mathematical theorem.</p>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">The α Tradeoff</div>
+        <p style="font-size:13px;color:var(--muted);font-family:'DM Mono',monospace;line-height:1.7;">
+          α controls the coverage-vs-set-size tradeoff. Lower α demands higher coverage,
+          pushing q lower, making prediction sets larger. Higher α allows smaller sets
+          but accepts more misses. In safety-critical settings, α is determined by
+          domain requirements — not math. A robot near humans needs α = 0.01.
+          A recommendation system might tolerate α = 0.30.
+        </p>
+      </div>
+    </div>
+  </main>
+
+  <!-- ==================== CODE TAB ==================== -->
+  <main id="tab-code" style="display:none;">
+    <div class="card">
+      <div class="card-title">Architecture — 5 Layers</div>
+
+      <div class="theory-block">
+        <h3>Layer 1 — environment.py</h3>
+        <p>10×10 grid, two agents, Gaussian noise model (σ=1.5). Defines the observation function obs = true_pos + ε.</p>
+        <div class="code-block"><span class="kw">def</span> <span class="fn">observe</span>(true_pos, rng, sigma=<span class="num">1.5</span>):
+    noise_x = rng.<span class="fn">normal</span>(<span class="num">0</span>, sigma)
+    noise_y = rng.<span class="fn">normal</span>(<span class="num">0</span>, sigma)
+    <span class="kw">return</span> clip_to_grid((round(x + noise_x), round(y + noise_y)))</div>
+      </div>
+
+      <div class="theory-block">
+        <h3>Layer 2 — classifier.py</h3>
+        <p>Generates 20,000 (observation, true position) training pairs. Trains logistic regression with softmax over 100 classes. Splits into train / calibration / test sets.</p>
+        <div class="code-block"><span class="cm"># 100 classes (one per grid cell), 2 features (obs_x, obs_y)</span>
+clf = <span class="fn">LogisticRegression</span>(solver=<span class="str">'lbfgs'</span>, max_iter=<span class="num">1000</span>)
+clf.<span class="fn">fit</span>(X_train, y_train)
+probs = clf.<span class="fn">predict_proba</span>(X_calib)  <span class="cm"># shape (n, 100)</span></div>
+      </div>
+
+      <div class="theory-block">
+        <h3>Layer 3 — conformal.py</h3>
+        <p>Computes conformity scores on the calibration set, derives threshold q using the finite-sample corrected quantile, produces prediction sets at test time with provable coverage.</p>
+        <div class="code-block">scores = probs[<span class="fn">np.arange</span>(n), y_calib]   <span class="cm"># true label probs</span>
+q = <span class="fn">np.quantile</span>(scores, ceil((n+<span class="num">1</span>)*alpha)/n)
+pred_set = [i <span class="kw">for</span> i, p <span class="kw">in</span> <span class="fn">enumerate</span>(probs) <span class="kw">if</span> p >= q]</div>
+      </div>
+
+      <div class="theory-block">
+        <h3>Layer 4 — policy.py</h3>
+        <p>Minimax policy: for each action, compute max cost over all positions in the prediction set. Pick the action minimizing worst-case cost. Collision penalty = 1000, goal cost = Manhattan distance.</p>
+        <div class="code-block">best = <span class="fn">min</span>(actions, key=<span class="kw">lambda</span> a:
+    <span class="fn">max</span>(cost(next_pos(a), p, goal) <span class="kw">for</span> p <span class="kw">in</span> pred_set))</div>
+      </div>
+
+      <div class="theory-block">
+        <h3>Layer 5 — visualize.py / index.html</h3>
+        <p>Python matplotlib animation for offline use. This web app re-implements the simulation in JavaScript for an interactive browser demo with real-time controls.</p>
+      </div>
+    </div>
+  </main>
+
+</div><!-- end .app -->
+
+<script>
+// ============================================================
+// SIMULATION ENGINE (JavaScript port of the Python code)
+// ============================================================
+
+const GRID = 10;
+const SIGMA = 1.5;
+const N_STEPS = 50;
+const N_TRAIN = 3000;
+const N_CALIB = 1000;
+
+// Math helpers
+function clip(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
+function clipPos([x, y]) { return [clip(Math.round(x), 0, GRID-1), clip(Math.round(y), 0, GRID-1)]; }
+function posToIdx([x, y]) { return x + y * GRID; }
+function idxToPos(i) { return [i % GRID, Math.floor(i / GRID)]; }
+function manhattan([ax,ay],[bx,by]) { return Math.abs(ax-bx) + Math.abs(ay-by); }
+
+// Seeded xorshift RNG
+class RNG {
+  constructor(seed=42) { this.s = seed | 0 || 1; }
+  next() { let s=this.s; s^=s<<13;s^=s>>17;s^=s<<5; return (this.s=s)>>>0; }
+  rand() { return this.next()/4294967296; }
+  normal() {
+    // Box-Muller transform
+    const u=this.rand()||1e-10, v=this.rand();
+    return Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*v);
+  }
+  int(lo,hi) { return lo + (this.next() % (hi-lo)); }
+  choice(arr) { return arr[this.next() % arr.length]; }
+}
+
+// Noisy observation of a position
+function observe(pos, rng, sigma=SIGMA) {
+  return clipPos([pos[0]+rng.normal()*sigma, pos[1]+rng.normal()*sigma]);
+}
+
+// Softmax normalization
+function softmax(logits) {
+  const mx = Math.max(...logits);
+  const ex = logits.map(z => Math.exp(z-mx));
+  const s = ex.reduce((a,b)=>a+b, 0);
+  return ex.map(v=>v/s);
+}
+
+// Logistic regression: 2 input features -> softmax over 100 grid cells
+class LogisticRegressor {
+  constructor() {
+    this.W = Array.from({length:100}, ()=>[0,0]);
+    this.b = new Array(100).fill(0);
+  }
+
+  predict(obs) {
+    const logits = this.W.map((w,i) => w[0]*obs[0] + w[1]*obs[1] + this.b[i]);
+    return softmax(logits);
+  }
+
+  train(X, Y, epochs=30, lr=0.05) {
+    const n = X.length;
+    for(let e=0;e<epochs;e++) {
+      const dW = Array.from({length:100},()=>[0,0]);
+      const db = new Array(100).fill(0);
+      let loss = 0;
+      for(let i=0;i<n;i++) {
+        const probs = this.predict(X[i]);
+        const y = Y[i];
+        loss -= Math.log(probs[y]+1e-10);
+        for(let c=0;c<100;c++) {
+          const err = probs[c] - (c===y?1:0);
+          dW[c][0] += err*X[i][0]/n;
+          dW[c][1] += err*X[i][1]/n;
+          db[c]    += err/n;
+        }
+      }
+      for(let c=0;c<100;c++) {
+        this.W[c][0] -= lr*dW[c][0];
+        this.W[c][1] -= lr*dW[c][1];
+        this.b[c]    -= lr*db[c];
+      }
+    }
+  }
+}
+
+// Wraps the classifier with conformal prediction
+class ConformalPredictor {
+  constructor(clf, alpha) {
+    this.clf = clf;
+    this.alpha = alpha;
+    this.q = null;
+  }
+
+  calibrate(Xcal, ycal) {
+    const scores = Xcal.map((x,i) => {
+      const probs = this.clf.predict(x);
+      return probs[ycal[i]];
+    });
+    scores.sort((a,b)=>a-b);
+    const n = scores.length;
+    const idx = Math.min(n-1, Math.ceil((n+1)*this.alpha));
+    this.q = scores[idx];
+  }
+
+  predictSet(obs) {
+    const probs = this.clf.predict(obs);
+    const set = [];
+    for(let i=0;i<100;i++) if(probs[i] >= this.q) set.push(idxToPos(i));
+    return { set, probs };
+  }
+}
+
+// Cost of moving to myNext given their position and our goal
+function cost(myNext, theirPos, goal) {
+  const coll = (myNext[0]===theirPos[0] && myNext[1]===theirPos[1]) ? 1000 : 0;
+  return coll + manhattan(myNext, goal);
+}
+
+// Minimax: pick action minimizing worst-case cost over prediction set
+const ACTIONS = {
+  up:    [0,-1], down:  [0,1],
+  left:  [-1,0], right: [1,0], stay: [0,0]
+};
+const ACTION_NAMES = Object.keys(ACTIONS);
+
+function minimaxAction(pos, predSet, goal) {
+  let bestAction = 'stay', bestCost = Infinity;
+  for(const name of ACTION_NAMES) {
+    const [dx,dy] = ACTIONS[name];
+    const next = clipPos([pos[0]+dx, pos[1]+dy]);
+    const worstCase = predSet.length === 0
+      ? manhattan(next, goal)
+      : Math.max(...predSet.map(p => cost(next, p, goal)));
+    if(worstCase < bestCost) { bestCost=worstCase; bestAction=name; }
+  }
+  return bestAction;
+}
+
+// ============================================================
+// SIMULATION STATE
+// ============================================================
+
+let clf = null;
+let predictor = null;
+let simRng = null;
+let simHistory = [];
+let currentStep = 0;
+let playing = false;
+let playInterval = null;
+let speed = 500;
+let alpha = 0.10;
+let trained = false;
+
+let posAHistory = [], posBHistory = [];
+let setSizesA = [], setSizesB = [];
+let covAHistory = [], covBHistory = [];
+let collisions = 0;
+
+// Mode state
+let simMode = 'random';
+let cmpMode = 'crossing';
+
+function setSimMode(mode) {
+  simMode = mode;
+  document.getElementById('simModeRandom').classList.toggle('active', mode === 'random');
+  document.getElementById('simModeClassic').classList.toggle('active', mode === 'classic');
+  resetSim();
+}
+
+function setCmpMode(mode) {
+  cmpMode = mode;
+  document.getElementById('cmpModeRandom').classList.toggle('active', mode === 'random');
+  document.getElementById('cmpModeCrossing').classList.toggle('active', mode === 'crossing');
+  document.getElementById('cmpModeClassic').classList.toggle('active', mode === 'classic');
+  resetCompare();
+}
+
+// Start positions and goals, randomized each episode
+let startA, startB, goalA, goalB;
+
+function randomPos(rng, exclude=[]) {
+  let pos;
+  do { pos = [rng.int(0, GRID), rng.int(0, GRID)]; }
+  while(exclude.some(([x,y]) => x===pos[0] && y===pos[1]));
+  return pos;
+}
+
+function randomizePositions() {
+  if(simMode === 'classic') {
+    startA = [0, 0]; goalA = [9, 9];
+    startB = [9, 9]; goalB = [0, 0];
+    return;
+  }
+  const rng = new RNG(Date.now() & 0xffffffff);
+  startA = randomPos(rng);
+  goalA  = randomPos(rng, [startA]);
+  startB = randomPos(rng, [startA, goalA]);
+  goalB  = randomPos(rng, [startA, goalA, startB]);
+}
+
+// ============================================================
+// CANVAS SETUP
+// ============================================================
+const canvas = document.getElementById('gridCanvas');
+const ctx = canvas.getContext('2d');
+const CELL = 46;
+const PAD = 20;
+const SIZE = GRID * CELL + PAD * 2;
+canvas.width = SIZE;
+canvas.height = SIZE;
+
+// ============================================================
+// DRAWING
+// ============================================================
+function cellCenter([x,y]) {
+  return [PAD + x*CELL + CELL/2, PAD + y*CELL + CELL/2];
+}
+
+function drawGrid() {
+  ctx.fillStyle = '#11111c';
+  ctx.fillRect(0, 0, SIZE, SIZE);
+
+  ctx.strokeStyle = '#1e1e2e';
+  ctx.lineWidth = 1;
+  for(let i=0;i<=GRID;i++) {
+    const x = PAD + i*CELL, y = PAD + i*CELL;
+    ctx.beginPath(); ctx.moveTo(x, PAD); ctx.lineTo(x, PAD+GRID*CELL); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(PAD, y); ctx.lineTo(PAD+GRID*CELL, y); ctx.stroke();
+  }
+
+  ctx.fillStyle = '#2a2a3d';
+  ctx.font = '9px DM Mono, monospace';
+  ctx.textAlign = 'center';
+  for(let i=0;i<GRID;i++) {
+    ctx.fillText(i, PAD+i*CELL+CELL/2, PAD-6);
+    ctx.fillText(i, PAD-8, PAD+i*CELL+CELL/2+3);
+  }
+}
+
+function drawPredSet(predSet, color, alpha_fill) {
+  ctx.fillStyle = color;
+  ctx.globalAlpha = alpha_fill;
+  for(const [x,y] of predSet) {
+    ctx.fillRect(PAD+x*CELL+1, PAD+y*CELL+1, CELL-2, CELL-2);
+  }
+  ctx.globalAlpha = 1;
+}
+
+function drawAgent(pos, color, label, glowColor) {
+  const [cx,cy] = cellCenter(pos);
+  // Glow
+  const grad = ctx.createRadialGradient(cx,cy,0,cx,cy,CELL*0.6);
+  grad.addColorStop(0, glowColor);
+  grad.addColorStop(1, 'transparent');
+  ctx.globalAlpha = 0.5;
+  ctx.fillStyle = grad;
+  ctx.beginPath(); ctx.arc(cx,cy,CELL*0.6,0,Math.PI*2); ctx.fill();
+  ctx.globalAlpha = 1;
+
+  // Circle
+  ctx.fillStyle = color;
+  ctx.beginPath(); ctx.arc(cx,cy,CELL*0.32,0,Math.PI*2); ctx.fill();
+
+  // Label
+  ctx.fillStyle = '#09090f';
+  ctx.font = 'bold 12px Syne, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(label, cx, cy);
+}
+
+function drawGoal(pos, color) {
+  const [cx,cy] = cellCenter(pos);
+  ctx.fillStyle = color;
+  ctx.globalAlpha = 0.3;
+  ctx.fillRect(PAD+pos[0]*CELL+1, PAD+pos[1]*CELL+1, CELL-2, CELL-2);
+  ctx.globalAlpha = 1;
+  ctx.fillStyle = color;
+  ctx.font = '18px sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText('★', cx, cy);
+}
+
+function drawPath(history, color) {
+  if(history.length < 2) return;
+  ctx.strokeStyle = color;
+  ctx.globalAlpha = 0.35;
+  ctx.lineWidth = 2;
+  ctx.setLineDash([3,3]);
+  ctx.beginPath();
+  const [sx,sy] = cellCenter(history[0]);
+  ctx.moveTo(sx,sy);
+  for(let i=1;i<history.length;i++) {
+    const [px,py] = cellCenter(history[i]);
+    ctx.lineTo(px,py);
+  }
+  ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.globalAlpha = 1;
+  ctx.lineWidth = 1;
+}
+
+function drawFrame(step) {
+  drawGrid();
+
+  if(!simHistory.length) {
+    drawGoal(goalA, '#4f9cf9');
+    drawGoal(goalB, '#f96060');
+    drawAgent(startA, '#4f9cf9', 'A', 'rgba(79,156,249,0.4)');
+    drawAgent(startB, '#f96060', 'B', 'rgba(249,96,96,0.4)');
+    return;
+  }
+
+  const s = simHistory[Math.min(step, simHistory.length-1)];
+
+  drawPredSet(s.predSetA, '#4f9cf9', 0.15);
+  drawPredSet(s.predSetB, '#f96060', 0.15);
+
+  const [oax,oay] = cellCenter(s.obsA);
+  const [obx,oby] = cellCenter(s.obsB);
+  ctx.strokeStyle = '#4f9cf9'; ctx.globalAlpha=0.5; ctx.lineWidth=1.5;
+  ctx.beginPath(); ctx.moveTo(oax-5,oay); ctx.lineTo(oax+5,oay);
+  ctx.moveTo(oax,oay-5); ctx.lineTo(oax,oay+5); ctx.stroke();
+  ctx.strokeStyle = '#f96060';
+  ctx.beginPath(); ctx.moveTo(obx-5,oby); ctx.lineTo(obx+5,oby);
+  ctx.moveTo(obx,oby-5); ctx.lineTo(obx,oby+5); ctx.stroke();
+  ctx.globalAlpha = 1; ctx.lineWidth = 1;
+
+  drawGoal(goalA, '#4f9cf9');
+  drawGoal(goalB, '#f96060');
+
+  drawPath(posAHistory.slice(0, step+2), '#4f9cf9');
+  drawPath(posBHistory.slice(0, step+2), '#f96060');
+
+  drawAgent(s.posA, '#4f9cf9', 'A', 'rgba(79,156,249,0.4)');
+  drawAgent(s.posB, '#f96060', 'B', 'rgba(249,96,96,0.4)');
+
+  if(s.collision) {
+    ctx.fillStyle = '#f9c74f';
+    ctx.globalAlpha = 0.4;
+    const [cx,cy] = cellCenter(s.posA);
+    ctx.beginPath(); ctx.arc(cx,cy,CELL*0.8,0,Math.PI*2); ctx.fill();
+    ctx.globalAlpha = 1;
+  }
+}
+
+// ============================================================
+// MINI CHARTS
+// ============================================================
+function drawSizeChart() {
+  const canvas = document.getElementById('sizeChart');
+  const ctx2 = canvas.getContext('2d');
+  const W = canvas.parentElement.clientWidth - 48;
+  canvas.width = W; canvas.height = 80;
+  ctx2.fillStyle = '#11111c'; ctx2.fillRect(0,0,W,80);
+
+  if(setSizesA.length < 2) return;
+  const maxSz = Math.max(...setSizesA, ...setSizesB, 1);
+  const n = setSizesA.length;
+
+  function drawLine(data, color) {
+    ctx2.strokeStyle = color; ctx2.lineWidth = 2; ctx2.globalAlpha=0.85;
+    ctx2.beginPath();
+    data.forEach((v,i) => {
+      const x = (i/(N_STEPS-1))*W;
+      const y = 80 - (v/maxSz)*75;
+      i===0 ? ctx2.moveTo(x,y) : ctx2.lineTo(x,y);
+    });
+    ctx2.stroke(); ctx2.globalAlpha=1;
+  }
+
+  // Target line (avg 100/expected)
+  ctx2.strokeStyle='#2a2a3d'; ctx2.lineWidth=1; ctx2.setLineDash([4,4]);
+  ctx2.beginPath(); ctx2.moveTo(0,40); ctx2.lineTo(W,40); ctx2.stroke();
+  ctx2.setLineDash([]);
+
+  drawLine(setSizesA, '#4f9cf9');
+  drawLine(setSizesB, '#f96060');
+}
+
+function drawCovChart() {
+  const canvas = document.getElementById('covChart');
+  const ctx2 = canvas.getContext('2d');
+  const W = canvas.parentElement.clientWidth - 48;
+  canvas.width = W; canvas.height = 70;
+  ctx2.fillStyle = '#11111c'; ctx2.fillRect(0,0,W,70);
+
+  if(covAHistory.length < 2) return;
+  const target = 1 - alpha;
+
+  // Target line
+  const ty = 70 - target*65;
+  ctx2.strokeStyle='#52d48a'; ctx2.lineWidth=1; ctx2.globalAlpha=0.4;
+  ctx2.setLineDash([4,4]);
+  ctx2.beginPath(); ctx2.moveTo(0,ty); ctx2.lineTo(W,ty); ctx2.stroke();
+  ctx2.setLineDash([]); ctx2.globalAlpha=1;
+
+  // Target label
+  ctx2.fillStyle='#52d48a'; ctx2.font='9px DM Mono'; ctx2.globalAlpha=0.6;
+  ctx2.fillText(`${Math.round(target*100)}%`, W-24, ty-3);
+  ctx2.globalAlpha=1;
+
+  function drawLine(data, color) {
+    ctx2.strokeStyle=color; ctx2.lineWidth=2; ctx2.globalAlpha=0.85;
+    ctx2.beginPath();
+    data.forEach((v,i) => {
+      const x=(i/(N_STEPS-1))*W;
+      const y=70-(v*65);
+      i===0?ctx2.moveTo(x,y):ctx2.lineTo(x,y);
+    });
+    ctx2.stroke(); ctx2.globalAlpha=1;
+  }
+
+  drawLine(covAHistory, '#4f9cf9');
+  drawLine(covBHistory, '#f96060');
+}
+
+// ============================================================
+// LOG
+// ============================================================
+function log(msg, type='') {
+  const el = document.getElementById('eventLog');
+  const line = document.createElement('div');
+  line.className = 'log-line';
+  const step = currentStep;
+  line.innerHTML = `<span class="t">[${String(step).padStart(2,'0')}]</span><span class="msg ${type}">${msg}</span>`;
+  el.appendChild(line);
+  el.scrollTop = el.scrollHeight;
+}
+
+function clearLog() {
+  document.getElementById('eventLog').innerHTML = '';
+}
+
+// ============================================================
+// TRAIN
+// ============================================================
+function trainModel() {
+  const rng = new RNG(99);
+  log('Generating training data...');
+  const X = [], Y = [];
+  for(let i=0;i<N_TRAIN;i++) {
+    const tx = rng.int(0, GRID), ty = rng.int(0, GRID);
+    const obs = observe([tx,ty], rng);
+    X.push(obs); Y.push(posToIdx([tx,ty]));
+  }
+
+  log('Training classifier...');
+  clf = new LogisticRegressor();
+  clf.train(X, Y, 60, 0.08);
+
+    const Xcal=[], Ycal=[];
+  for(let i=0;i<N_CALIB;i++) {
+    const tx=rng.int(0,GRID),ty=rng.int(0,GRID);
+    const obs=observe([tx,ty],rng);
+    Xcal.push(obs); Ycal.push(posToIdx([tx,ty]));
+  }
+  predictor = new ConformalPredictor(clf, alpha);
+  predictor.calibrate(Xcal, Ycal);
+
+  log(`Calibrated. q = ${predictor.q.toFixed(4)}`, 'ok');
+  document.getElementById('statQ').textContent = predictor.q.toFixed(4);
+  document.getElementById('covTarget').textContent = `${Math.round((1-alpha)*100)}%`;
+  trained = true;
+}
+
+// ============================================================
+// SIMULATION STEP
+// ============================================================
+function simStep() {
+  const last = simHistory.length === 0
+    ? { posA: startA, posB: startB }
+    : simHistory[simHistory.length-1];
+
+  const posA = last.posA, posB = last.posB;
+
+  // Agents at goal stay put; still run conformal for the moving agent
+  const aAtGoal = posA[0]===goalA[0] && posA[1]===goalA[1];
+  const bAtGoal = posB[0]===goalB[0] && posB[1]===goalB[1];
+
+  const obsA = observe(posB, simRng);
+  const obsB = observe(posA, simRng);
+  const { set: predSetA } = predictor.predictSet(obsA);
+  const { set: predSetB } = predictor.predictSet(obsB);
+
+  const actionA = aAtGoal ? 'stay' : minimaxAction(posA, predSetA, goalA);
+  const actionB = bAtGoal ? 'stay' : minimaxAction(posB, predSetB, goalB);
+
+  const [dax,day]=ACTIONS[actionA], [dbx,dby]=ACTIONS[actionB];
+  const newA = aAtGoal ? posA : clipPos([posA[0]+dax, posA[1]+day]);
+  const newB = bAtGoal ? posB : clipPos([posB[0]+dbx, posB[1]+dby]);
+
+  const trueInA = predSetA.some(([x,y])=>x===posB[0]&&y===posB[1]);
+  const trueInB = predSetB.some(([x,y])=>x===posA[0]&&y===posA[1]);
+
+  const collision = !aAtGoal && !bAtGoal && newA[0]===newB[0] && newA[1]===newB[1];
+  if(collision) { collisions++; log(`Collision at (${newA})!`, 'warn'); }
+  if(!trueInA) log(`A missed B (not in set)`, 'warn');
+  if(!trueInB) log(`B missed A (not in set)`, 'warn');
+
+  covAHistory.push(trueInA?1:0);
+  covBHistory.push(trueInB?1:0);
+  setSizesA.push(predSetA.length);
+  setSizesB.push(predSetB.length);
+  posAHistory.push(newA);
+  posBHistory.push(newB);
+
+  const runCovA = covAHistory.reduce((a,b)=>a+b,0)/covAHistory.length;
+  const runCovB = covBHistory.reduce((a,b)=>a+b,0)/covBHistory.length;
+  covAHistory[covAHistory.length-1] = runCovA;
+  covBHistory[covBHistory.length-1] = runCovB;
+
+  simHistory.push({
+    posA: newA, posB: newB,
+    obsA, obsB,
+    predSetA, predSetB,
+    actionA, actionB,
+    collision
+  });
+
+  return { newA, newB, predSetA, predSetB, actionA, actionB, runCovA, runCovB };
+}
+
+// ============================================================
+// UPDATE UI
+// ============================================================
+function updateUI(step) {
+  if(step < 0 || !simHistory.length) return;
+  const s = simHistory[Math.min(step, simHistory.length-1)];
+  const idx = Math.min(step, setSizesA.length-1);
+
+  document.getElementById('stepBadge').textContent = `Step ${step+1} / ${N_STEPS}`;
+  document.getElementById('statCollisions').textContent = collisions;
+
+  const avgCov = ((covAHistory[idx]||0)+(covBHistory[idx]||0))/2;
+  document.getElementById('statCoverage').textContent = `${Math.round(avgCov*100)}%`;
+  const avgSz = ((setSizesA[idx]||0)+(setSizesB[idx]||0))/2;
+  document.getElementById('statSetSize').textContent = avgSz.toFixed(1);
+
+  document.getElementById('posA').textContent = `(${s.posA})`;
+  document.getElementById('posB').textContent = `(${s.posB})`;
+  document.getElementById('setSizeA').textContent = `${s.predSetA.length} cells`;
+  document.getElementById('setSizeB').textContent = `${s.predSetB.length} cells`;
+  document.getElementById('covA').textContent = `${Math.round((covAHistory[idx]||0)*100)}%`;
+  document.getElementById('covB').textContent = `${Math.round((covBHistory[idx]||0)*100)}%`;
+  document.getElementById('actionA').textContent = s.actionA;
+  document.getElementById('actionB').textContent = s.actionB;
+
+  document.getElementById('covBarA').style.width = `${Math.round((covAHistory[idx]||0)*100)}%`;
+  document.getElementById('covBarB').style.width = `${Math.round((covBHistory[idx]||0)*100)}%`;
+
+  drawFrame(step);
+  drawSizeChart();
+  drawCovChart();
+}
+
+// ============================================================
+// CONTROLS
+// ============================================================
+function togglePlay() {
+  if(playing) {
+    clearInterval(playInterval);
+    playing = false;
+    document.getElementById('btnPlay').textContent = '▶ Run';
+  } else {
+    if(!trained) {
+      clearLog();
+      log('Training model...', '');
+      setTimeout(()=>{
+        trainModel();
+        startPlaying();
+      }, 50);
+    } else {
+      startPlaying();
+    }
+  }
+}
+
+function startPlaying() {
+  playing = true;
+  document.getElementById('btnPlay').textContent = '⏸ Pause';
+
+  playInterval = setInterval(()=>{
+    const lastA = posAHistory[posAHistory.length-1];
+    const lastB = posBHistory[posBHistory.length-1];
+    const bothDone = lastA && lastB &&
+                     lastA[0]===goalA[0] && lastA[1]===goalA[1] &&
+                     lastB[0]===goalB[0] && lastB[1]===goalB[1];
+
+    if(currentStep >= N_STEPS || bothDone) {
+      clearInterval(playInterval);
+      playing = false;
+      document.getElementById('btnPlay').textContent = '✓ Done';
+      document.getElementById('btnPlay').disabled = true;
+      log(`Complete. Collisions: ${collisions}`, 'ok');
+      const finalCovA = covAHistory[covAHistory.length-1];
+      const finalCovB = covBHistory[covBHistory.length-1];
+      log(`Coverage A: ${Math.round(finalCovA*100)}%  B: ${Math.round(finalCovB*100)}%`, 'ok');
+      if(bothDone) log(`Both agents reached their goals!`, 'ok');
+      return;
+    }
+    simStep();
+    updateUI(currentStep);
+    currentStep++;
+  }, 1050 - speed);
+}
+
+function resetSim() {
+  clearInterval(playInterval);
+  playing = false;
+  trained = false;
+  clf = null; predictor = null;
+  simRng = new RNG(Date.now() & 0xffffffff);
+  simHistory = [];
+  setSizesA = []; setSizesB = [];
+  covAHistory = []; covBHistory = [];
+  collisions = 0;
+  currentStep = 0;
+
+  randomizePositions();
+  posAHistory = [startA];
+  posBHistory = [startB];
+
+  document.getElementById('btnPlay').textContent = '▶ Run';
+  document.getElementById('btnPlay').disabled = false;
+  document.getElementById('stepBadge').textContent = 'Step 0 / 50';
+  document.getElementById('statCollisions').textContent = '0';
+  document.getElementById('statCoverage').textContent = '—';
+  document.getElementById('statSetSize').textContent = '—';
+  document.getElementById('statQ').textContent = '—';
+  document.getElementById('posA').textContent = `(${startA})`;
+  document.getElementById('posB').textContent = `(${startB})`;
+  document.getElementById('goalA').textContent = `(${goalA})`;
+  document.getElementById('goalB').textContent = `(${goalB})`;
+  document.getElementById('setSizeA').textContent = '—';
+  document.getElementById('setSizeB').textContent = '—';
+  document.getElementById('covA').textContent = '—';
+  document.getElementById('covB').textContent = '—';
+  document.getElementById('actionA').textContent = '—';
+  document.getElementById('actionB').textContent = '—';
+  document.getElementById('covBarA').style.width = '0%';
+  document.getElementById('covBarB').style.width = '0%';
+  clearLog();
+  drawFrame(-1);
+  drawSizeChart();
+  drawCovChart();
+}
+
+function updateSpeed(v) { speed = parseInt(v); }
+
+function updateAlpha(v) {
+  alpha = parseInt(v)/100;
+  document.getElementById('alphaVal').textContent = alpha.toFixed(2);
+  document.getElementById('covTarget').textContent = `${Math.round((1-alpha)*100)}%`;
+  if(trained) { resetSim(); }
+}
+
+
+// ============================================================
+// CURATED CROSSING LAYOUTS
+// ============================================================
+// Pre-validated: baseline gets >= 1 collision, conformal gets fewer.
+// Sorted by safety delta (base_collisions+near_misses - conf equivalent).
+// Cycles through on each Reset so the demo always shows a meaningful comparison.
+
+const CROSSING_LAYOUTS = [
+  { sA:[9,2], gA:[6,3], sB:[7,2], gB:[7,3] },   // base_coll=1 conf_coll=0  base_near=48 conf_near=10
+  { sA:[5,7], gA:[7,0], sB:[7,5], gB:[6,0] },   // base_coll=1 conf_coll=0  base_near=43 conf_near=13
+  { sA:[3,3], gA:[4,6], sB:[4,0], gB:[2,9] },   // base_coll=1 conf_coll=0  base_near=2  conf_near=0
+  { sA:[3,1], gA:[6,7], sB:[6,4], gB:[3,5] },   // base_coll=1 conf_coll=0  base_near=1  conf_near=0
+  { sA:[3,3], gA:[1,8], sB:[0,6], gB:[3,6] },   // base_coll=1 conf_coll=0  base_near=1  conf_near=0
+];
+
+let cmpLayoutIndex = 0;
+
+function selectCrossingExample(i) {
+  cmpLayoutIndex = i;
+  // Update button active states
+  for(let k = 0; k < CROSSING_LAYOUTS.length; k++) {
+    document.getElementById(`cmpEx${k}`).classList.toggle('active', k === i);
+  }
+  resetCompare();
+}
+
+function getCrossingLayout() {
+  const L = CROSSING_LAYOUTS[cmpLayoutIndex];
+  return { sA: [...L.sA], gA: [...L.gA], sB: [...L.sB], gB: [...L.gB] };
+}
+
+
+
+
+// -- Greedy baseline action (ignores other agent) --
+function greedyAction(pos, goal) {
+  let bestAction = 'stay', bestDist = Infinity;
+  for(const name of ACTION_NAMES) {
+    const [dx,dy] = ACTIONS[name];
+    const next = clipPos([pos[0]+dx, pos[1]+dy]);
+    const d = manhattan(next, goal);
+    if(d < bestDist) { bestDist = d; bestAction = name; }
+  }
+  return bestAction;
+}
+
+// -- Shared state --
+let cmpAlpha = 0.10;
+let cmpSpeed = 500;
+let cmpPlaying = false;
+let cmpInterval = null;
+let cmpTrained = false;
+let cmpClf = null;
+let cmpPredictor = null;
+let cmpStep = 0;
+
+// Shared layout (both envs use same start/goal)
+let cmpStartA, cmpStartB, cmpGoalA, cmpGoalB;
+
+// Baseline state
+let baseRng, basePosA, basePosB;
+let basePosAHist, basePosBHist;
+let baseCollisions, baseNearMisses;
+
+// Conformal state
+let confRng, confPosA, confPosB;
+let confPosAHist, confPosBHist;
+let confCollisions, confNearMisses;
+let confCovA, confCovB;
+let confSetSizesA, confSetSizesB;
+let confHistory; // full frame history for prediction set rendering
+
+// -- Canvas setup --
+const CMP_CELL = 40;
+const CMP_PAD  = 16;
+const CMP_SIZE = GRID * CMP_CELL + CMP_PAD * 2;
+
+const baseCanvas = document.getElementById('baseCanvas');
+const ctxB = baseCanvas.getContext('2d');
+baseCanvas.width = CMP_SIZE; baseCanvas.height = CMP_SIZE;
+
+const confCanvas = document.getElementById('confCanvas');
+const ctxC = confCanvas.getContext('2d');
+confCanvas.width = CMP_SIZE; confCanvas.height = CMP_SIZE;
+
+// -- Drawing helpers for compare canvases --
+function cmpCellCenter(ctx_unused, [x,y]) {
+  return [CMP_PAD + x*CMP_CELL + CMP_CELL/2, CMP_PAD + y*CMP_CELL + CMP_CELL/2];
+}
+
+function drawCmpGrid(ctx) {
+  ctx.fillStyle = '#11111c';
+  ctx.fillRect(0, 0, CMP_SIZE, CMP_SIZE);
+  ctx.strokeStyle = '#1e1e2e';
+  ctx.lineWidth = 1;
+  for(let i=0;i<=GRID;i++) {
+    const x=CMP_PAD+i*CMP_CELL, y=CMP_PAD+i*CMP_CELL;
+    ctx.beginPath(); ctx.moveTo(x,CMP_PAD); ctx.lineTo(x,CMP_PAD+GRID*CMP_CELL); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(CMP_PAD,y); ctx.lineTo(CMP_PAD+GRID*CMP_CELL,y); ctx.stroke();
+  }
+}
+
+function drawCmpGoal(ctx, pos, color) {
+  ctx.fillStyle = color;
+  ctx.globalAlpha = 0.28;
+  ctx.fillRect(CMP_PAD+pos[0]*CMP_CELL+1, CMP_PAD+pos[1]*CMP_CELL+1, CMP_CELL-2, CMP_CELL-2);
+  ctx.globalAlpha = 1;
+  const [cx,cy] = [CMP_PAD+pos[0]*CMP_CELL+CMP_CELL/2, CMP_PAD+pos[1]*CMP_CELL+CMP_CELL/2];
+  ctx.fillStyle = color;
+  ctx.globalAlpha = 0.7;
+  ctx.font = 'bold 11px Syne';
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillText('★', cx, cy);
+  ctx.globalAlpha = 1;
+}
+
+function drawCmpPredSet(ctx, predSet, color) {
+  ctx.fillStyle = color;
+  ctx.globalAlpha = 0.18;
+  for(const [x,y] of predSet)
+    ctx.fillRect(CMP_PAD+x*CMP_CELL+1, CMP_PAD+y*CMP_CELL+1, CMP_CELL-2, CMP_CELL-2);
+  ctx.globalAlpha = 1;
+}
+
+function drawCmpPath(ctx, hist, color) {
+  if(hist.length < 2) return;
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 1.5;
+  ctx.globalAlpha = 0.35;
+  ctx.beginPath();
+  for(let i=0;i<hist.length;i++) {
+    const [cx,cy]=[CMP_PAD+hist[i][0]*CMP_CELL+CMP_CELL/2, CMP_PAD+hist[i][1]*CMP_CELL+CMP_CELL/2];
+    i===0 ? ctx.moveTo(cx,cy) : ctx.lineTo(cx,cy);
+  }
+  ctx.stroke();
+  ctx.globalAlpha = 1;
+}
+
+function drawCmpAgent(ctx, pos, color, label, glowHex, done=false) {
+  const cx=CMP_PAD+pos[0]*CMP_CELL+CMP_CELL/2, cy=CMP_PAD+pos[1]*CMP_CELL+CMP_CELL/2;
+  const r = CMP_CELL * 0.28;
+  // Glow -- dimmed if at goal
+  const glowAlpha = done ? 0.2 : 0.4;
+  const grad = ctx.createRadialGradient(cx,cy,0,cx,cy,CMP_CELL*0.55);
+  grad.addColorStop(0, glowHex);
+  grad.addColorStop(1, 'transparent');
+  ctx.globalAlpha = glowAlpha;
+  ctx.fillStyle = grad;
+  ctx.beginPath(); ctx.arc(cx,cy,CMP_CELL*0.55,0,Math.PI*2); ctx.fill();
+  ctx.globalAlpha = 1;
+  // Dot -- slightly dimmed ring when done
+  ctx.fillStyle = done ? 'transparent' : color;
+  ctx.strokeStyle = color;
+  ctx.lineWidth = done ? 2 : 0;
+  ctx.beginPath(); ctx.arc(cx,cy,r,0,Math.PI*2);
+  done ? ctx.stroke() : ctx.fill();
+  // Label
+  ctx.fillStyle = done ? color : '#09090f';
+  ctx.font = `bold ${done ? 13 : 11}px Syne`;
+  ctx.textAlign='center'; ctx.textBaseline='middle';
+  ctx.fillText(label, cx, cy);
+}
+
+function drawCmpCollisionFlash(ctx, posA, posB) {
+  if(posA[0]===posB[0] && posA[1]===posB[1]) {
+    const cx=CMP_PAD+posA[0]*CMP_CELL+CMP_CELL/2, cy=CMP_PAD+posA[1]*CMP_CELL+CMP_CELL/2;
+    ctx.strokeStyle='#f96060'; ctx.lineWidth=2.5;
+    ctx.globalAlpha=0.9;
+    ctx.beginPath(); ctx.arc(cx,cy,CMP_CELL*0.52,0,Math.PI*2); ctx.stroke();
+    ctx.globalAlpha=1;
+  }
+}
+
+// -- Draw a full frame for one panel --
+function drawBaseFrame(step) {
+  drawCmpGrid(ctxB);
+  drawCmpGoal(ctxB, cmpGoalA, '#4f9cf9');
+  drawCmpGoal(ctxB, cmpGoalB, '#f96060');
+  drawCmpPath(ctxB, basePosAHist.slice(0, step+2), '#4f9cf9');
+  drawCmpPath(ctxB, basePosBHist.slice(0, step+2), '#f96060');
+  const pa = basePosAHist[Math.min(step+1, basePosAHist.length-1)];
+  const pb = basePosBHist[Math.min(step+1, basePosBHist.length-1)];
+  const aDone = atGoal(pa, cmpGoalA);
+  const bDone = atGoal(pb, cmpGoalB);
+  drawCmpAgent(ctxB, pa, '#4f9cf9', aDone ? '✓' : 'A', 'rgba(79,156,249,0.6)', aDone);
+  drawCmpAgent(ctxB, pb, '#f96060', bDone ? '✓' : 'B', 'rgba(249,96,96,0.6)', bDone);
+  drawCmpCollisionFlash(ctxB, pa, pb);
+}
+
+function drawConfFrame(step) {
+  drawCmpGrid(ctxC);
+  drawCmpGoal(ctxC, cmpGoalA, '#4f9cf9');
+  drawCmpGoal(ctxC, cmpGoalB, '#f96060');
+  const h = confHistory[step];
+  if(h) {
+    drawCmpPredSet(ctxC, h.predSetA, '#4f9cf9');
+    drawCmpPredSet(ctxC, h.predSetB, '#f96060');
+  }
+  drawCmpPath(ctxC, confPosAHist.slice(0, step+2), '#4f9cf9');
+  drawCmpPath(ctxC, confPosBHist.slice(0, step+2), '#f96060');
+  const pa = confPosAHist[Math.min(step+1, confPosAHist.length-1)];
+  const pb = confPosBHist[Math.min(step+1, confPosBHist.length-1)];
+  const aDone = atGoal(pa, cmpGoalA);
+  const bDone = atGoal(pb, cmpGoalB);
+  drawCmpAgent(ctxC, pa, '#4f9cf9', aDone ? '✓' : 'A', 'rgba(79,156,249,0.6)', aDone);
+  drawCmpAgent(ctxC, pb, '#f96060', bDone ? '✓' : 'B', 'rgba(249,96,96,0.6)', bDone);
+  drawCmpCollisionFlash(ctxC, pa, pb);
+}
+
+// -- Run one step of each simulation --
+function atGoal(pos, goal) { return pos[0]===goal[0] && pos[1]===goal[1]; }
+
+function cmpSimStep() {
+  // -- Baseline step --
+  // Agents that have reached their goal stay put
+  if(!atGoal(basePosA, cmpGoalA)) {
+    const bActA = greedyAction(basePosA, cmpGoalA);
+    const [bdax,bday] = ACTIONS[bActA];
+    basePosA = clipPos([basePosA[0]+bdax, basePosA[1]+bday]);
+  }
+  if(!atGoal(basePosB, cmpGoalB)) {
+    const bActB = greedyAction(basePosB, cmpGoalB);
+    const [bdbx,bdby] = ACTIONS[bActB];
+    basePosB = clipPos([basePosB[0]+bdbx, basePosB[1]+bdby]);
+  }
+  basePosAHist.push(basePosA);
+  basePosBHist.push(basePosB);
+
+  // Only count collisions/near-misses while both agents are still moving
+  const bBothMoving = !atGoal(basePosA, cmpGoalA) || !atGoal(basePosB, cmpGoalB);
+  if(bBothMoving) {
+    if(basePosA[0]===basePosB[0] && basePosA[1]===basePosB[1]) baseCollisions++;
+    const bDist = manhattan(basePosA, basePosB);
+    if(bDist <= 1 && !(basePosA[0]===basePosB[0] && basePosA[1]===basePosB[1])) baseNearMisses++;
+  }
+
+  // -- Conformal step --
+  // Agents at goal stay put; still generate observations for the other agent
+  const cActA = atGoal(confPosA, cmpGoalA) ? 'stay' : (() => {
+    const obsA = observe(confPosB, confRng);
+    const { set: predSetA } = cmpPredictor.predictSet(obsA);
+    const trueInA = predSetA.some(([x,y])=>x===confPosB[0]&&y===confPosB[1]);
+    confCovA.push(trueInA?1:0);
+    confSetSizesA.push(predSetA.length);
+    confHistory.push({ predSetA, predSetB: confHistory.length > 0 ? confHistory[confHistory.length-1].predSetB : [] });
+    return minimaxAction(confPosA, predSetA, cmpGoalA);
+  })();
+
+  const cActB = atGoal(confPosB, cmpGoalB) ? 'stay' : (() => {
+    const obsB = observe(confPosA, confRng);
+    const { set: predSetB } = cmpPredictor.predictSet(obsB);
+    const trueInB = predSetB.some(([x,y])=>x===confPosA[0]&&y===confPosA[1]);
+    confCovB.push(trueInB?1:0);
+    confSetSizesB.push(predSetB.length);
+    // update last history entry with predSetB
+    if(confHistory.length > 0) confHistory[confHistory.length-1].predSetB = predSetB;
+    else confHistory.push({ predSetA: [], predSetB });
+    return minimaxAction(confPosB, predSetB, cmpGoalB);
+  })();
+
+  // If both were at goal, push empty history frame
+  if(atGoal(confPosA, cmpGoalA) && atGoal(confPosB, cmpGoalB)) {
+    confHistory.push({ predSetA: [], predSetB: [] });
+  }
+
+  const [cdax,cday]=ACTIONS[cActA], [cdbx,cdby]=ACTIONS[cActB];
+  if(!atGoal(confPosA, cmpGoalA)) confPosA = clipPos([confPosA[0]+cdax, confPosA[1]+cday]);
+  if(!atGoal(confPosB, cmpGoalB)) confPosB = clipPos([confPosB[0]+cdbx, confPosB[1]+cdby]);
+  confPosAHist.push(confPosA);
+  confPosBHist.push(confPosB);
+
+  const cBothMoving = !atGoal(confPosA, cmpGoalA) || !atGoal(confPosB, cmpGoalB);
+  if(cBothMoving) {
+    if(confPosA[0]===confPosB[0] && confPosA[1]===confPosB[1]) confCollisions++;
+    const cDist = manhattan(confPosA, confPosB);
+    if(cDist <= 1 && !(confPosA[0]===confPosB[0] && confPosA[1]===confPosB[1])) confNearMisses++;
+  }
+}
+
+// -- Update metrics table mid/post-run --
+function updateMetrics(final=false) {
+  const s = cmpStep;
+
+  // Collisions so far
+  const setCell = (id, val, better) => {
+    const el = document.getElementById(id);
+    if(!el) return;
+    el.textContent = val;
+    el.className = '';
+    if(better === 'good') el.classList.add('val-better');
+    if(better === 'bad')  el.classList.add('val-worse');
+  };
+
+  setCell('m-base-coll', baseCollisions);
+  setCell('m-conf-coll', confCollisions,
+    confCollisions < baseCollisions ? 'good' : confCollisions > baseCollisions ? 'bad' : '');
+
+  setCell('m-base-near', baseNearMisses);
+  setCell('m-conf-near', confNearMisses,
+    confNearMisses < baseNearMisses ? 'good' : confNearMisses > baseNearMisses ? 'bad' : '');
+
+  const bDistA = manhattan(basePosA, cmpGoalA);
+  const bDistB = manhattan(basePosB, cmpGoalB);
+  const cDistA = manhattan(confPosA, cmpGoalA);
+  const cDistB = manhattan(confPosB, cmpGoalB);
+  setCell('m-base-dista', bDistA);
+  setCell('m-conf-dista', cDistA, cDistA < bDistA ? 'good' : cDistA > bDistA ? 'bad' : '');
+  setCell('m-base-distb', bDistB);
+  setCell('m-conf-distb', cDistB, cDistB < bDistB ? 'good' : cDistB > bDistB ? 'bad' : '');
+
+  if(confCovA.length > 0) {
+    const covA = confCovA.reduce((a,b)=>a+b,0)/confCovA.length;
+    const covB = confCovB.reduce((a,b)=>a+b,0)/confCovB.length;
+    const target = 1 - cmpAlpha;
+    document.getElementById('m-conf-cova').textContent = `${Math.round(covA*100)}%`;
+    document.getElementById('m-conf-cova').className = covA >= target ? 'val-better' : 'val-worse';
+    document.getElementById('m-conf-covb').textContent = `${Math.round(covB*100)}%`;
+    document.getElementById('m-conf-covb').className = covB >= target ? 'val-better' : 'val-worse';
+    const avgSetA = confSetSizesA.reduce((a,b)=>a+b,0)/confSetSizesA.length;
+    const avgSetB = confSetSizesB.reduce((a,b)=>a+b,0)/confSetSizesB.length;
+    document.getElementById('m-conf-seta').textContent = avgSetA.toFixed(1) + ' cells';
+    document.getElementById('m-conf-setb').textContent = avgSetB.toFixed(1) + ' cells';
+  }
+
+  // Winner badges
+  const winBadge = (id, bVal, cVal) => {
+    const el = document.getElementById(id);
+    if(!el) return;
+    if(bVal < cVal) {
+      el.innerHTML = '<span class="badge-winner base">Baseline</span>';
+    } else if(cVal < bVal) {
+      el.innerHTML = '<span class="badge-winner conf">Conformal</span>';
+    } else {
+      el.innerHTML = '<span class="badge-winner tie">Tie</span>';
+    }
+  };
+  winBadge('m-win-coll', baseCollisions, confCollisions);
+  winBadge('m-win-near', baseNearMisses, confNearMisses);
+  winBadge('m-win-dista', bDistA, cDistA);
+  winBadge('m-win-distb', bDistB, cDistB);
+}
+
+// -- Train both models (baseline needs no model, conformal does) --
+function trainCmpModel() {
+  const rng = new RNG(99);
+  const X=[], Y=[];
+  for(let i=0;i<N_TRAIN;i++) {
+    const tx=rng.int(0,GRID), ty=rng.int(0,GRID);
+    X.push(observe([tx,ty],rng)); Y.push(posToIdx([tx,ty]));
+  }
+  cmpClf = new LogisticRegressor();
+  cmpClf.train(X, Y, 60, 0.08);
+  const Xc=[], Yc=[];
+  for(let i=0;i<N_CALIB;i++) {
+    const tx=rng.int(0,GRID), ty=rng.int(0,GRID);
+    Xc.push(observe([tx,ty],rng)); Yc.push(posToIdx([tx,ty]));
+  }
+  cmpPredictor = new ConformalPredictor(cmpClf, cmpAlpha);
+  cmpPredictor.calibrate(Xc, Yc);
+  cmpTrained = true;
+}
+
+function initCmpState() {
+  if(cmpMode === 'classic') {
+    cmpStartA = [0, 0]; cmpGoalA = [9, 9];
+    cmpStartB = [9, 9]; cmpGoalB = [0, 0];
+    document.getElementById('cmpExamplePicker').style.display = 'none';
+  } else if(cmpMode === 'crossing') {
+    const { sA, gA, sB, gB } = getCrossingLayout();
+    cmpStartA = sA; cmpGoalA = gA;
+    cmpStartB = sB; cmpGoalB = gB;
+    document.getElementById('cmpExamplePicker').style.display = '';
+  } else {
+    // random -- no crossing guarantee
+    const rng = new RNG(Date.now() & 0xffffffff);
+    cmpStartA = randomPos(rng);
+    cmpGoalA  = randomPos(rng, [cmpStartA]);
+    cmpStartB = randomPos(rng, [cmpStartA, cmpGoalA]);
+    cmpGoalB  = randomPos(rng, [cmpStartA, cmpGoalA, cmpStartB]);
+    document.getElementById('cmpExamplePicker').style.display = 'none';
+  }
+
+  // Both share the same seed so noise sequences match
+  const sharedSeed = Date.now() & 0xffffffff;
+  baseRng = new RNG(sharedSeed);
+  confRng = new RNG(sharedSeed);
+
+  basePosA = [...cmpStartA]; basePosB = [...cmpStartB];
+  basePosAHist = [[...cmpStartA]]; basePosBHist = [[...cmpStartB]];
+  baseCollisions = 0; baseNearMisses = 0;
+
+  confPosA = [...cmpStartA]; confPosB = [...cmpStartB];
+  confPosAHist = [[...cmpStartA]]; confPosBHist = [[...cmpStartB]];
+  confCollisions = 0; confNearMisses = 0;
+  confCovA = []; confCovB = [];
+  confSetSizesA = []; confSetSizesB = [];
+  confHistory = [];
+
+  cmpStep = 0;
+}
+
+function toggleCompare() {
+  if(cmpPlaying) {
+    clearInterval(cmpInterval);
+    cmpPlaying = false;
+    document.getElementById('btnCompare').textContent = '▶ Run Comparison';
+  } else {
+    if(!cmpTrained) {
+      document.getElementById('btnCompare').textContent = '⏳ Training...';
+      document.getElementById('btnCompare').disabled = true;
+      setTimeout(() => {
+        trainCmpModel();
+        initCmpState();
+        document.getElementById('btnCompare').disabled = false;
+        startComparing();
+      }, 50);
+    } else {
+      startComparing();
+    }
+  }
+}
+
+function startComparing() {
+  cmpPlaying = true;
+  document.getElementById('btnCompare').textContent = '⏸ Pause';
+
+  cmpInterval = setInterval(() => {
+    const allDone = atGoal(basePosA,cmpGoalA) && atGoal(basePosB,cmpGoalB) &&
+                    atGoal(confPosA,cmpGoalA) && atGoal(confPosB,cmpGoalB);
+
+    if(cmpStep >= N_STEPS || allDone) {
+      clearInterval(cmpInterval);
+      cmpPlaying = false;
+      document.getElementById('btnCompare').textContent = '✓ Done';
+      document.getElementById('btnCompare').disabled = true;
+      updateMetrics(true);
+      return;
+    }
+    cmpSimStep();
+    const s = cmpStep;
+    drawBaseFrame(s);
+    drawConfFrame(s);
+    document.getElementById('cmpStepBadge').textContent = `Step ${s+1} / ${N_STEPS}`;
+
+    const bColl = baseCollisions;
+    const cColl = confCollisions;
+    document.getElementById('baseInfo').textContent =
+      `Collisions: ${bColl}  |  A→(${basePosA}) goal(${cmpGoalA})`;
+    document.getElementById('confInfo').textContent =
+      `Collisions: ${cColl}  |  Set A: ${confSetSizesA[confSetSizesA.length-1]} cells`;
+
+    updateMetrics();
+    cmpStep++;
+  }, 1050 - cmpSpeed);
+}
+
+function resetCompare() {
+  clearInterval(cmpInterval);
+  cmpPlaying = false;
+  cmpTrained = false;
+  cmpClf = null; cmpPredictor = null;
+  document.getElementById('btnCompare').textContent = '▶ Run Comparison';
+  document.getElementById('btnCompare').disabled = false;
+  document.getElementById('cmpStepBadge').textContent = 'Step 0 / 50';
+  document.getElementById('baseInfo').textContent = '—';
+  document.getElementById('confInfo').textContent = '—';
+
+  // Clear metric cells
+  ['m-base-coll','m-conf-coll','m-win-coll',
+   'm-base-near','m-conf-near','m-win-near',
+   'm-base-dista','m-conf-dista','m-win-dista',
+   'm-base-distb','m-conf-distb','m-win-distb',
+   'm-conf-cova','m-conf-covb','m-conf-seta','m-conf-setb'
+  ].forEach(id => {
+    const el = document.getElementById(id);
+    if(el) { el.textContent = '—'; el.className = ''; }
+  });
+
+  drawCmpGrid(ctxB); drawCmpGrid(ctxC);
+}
+
+function updateCmpAlpha(v) {
+  cmpAlpha = parseInt(v)/100;
+  document.getElementById('cmpAlphaVal').textContent = cmpAlpha.toFixed(2);
+  document.getElementById('cmpCovTarget').textContent = `${Math.round((1-cmpAlpha)*100)}%`;
+  if(cmpTrained) resetCompare();
+}
+
+// Draw initial blank grids
+drawCmpGrid(ctxB);
+drawCmpGrid(ctxC);
+
+function switchTab(name) {
+  document.querySelectorAll('main').forEach(m => {
+    m.style.display='none'; m.classList.remove('active');
+  });
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  const el = document.getElementById(`tab-${name}`);
+  el.style.display = 'grid';
+  el.classList.add('active');
+  event.target.classList.add('active');
+}
+
+// ============================================================
+// INIT
+// ============================================================
+randomizePositions();
+simRng = new RNG(Date.now() & 0xffffffff);
+posAHistory = [startA];
+posBHistory = [startB];
+document.getElementById('posA').textContent = `(${startA})`;
+document.getElementById('posB').textContent = `(${startB})`;
+document.getElementById('goalA').textContent = `(${goalA})`;
+document.getElementById('goalB').textContent = `(${goalB})`;
+drawFrame(-1);
+</script>
+</body>
+</html>
