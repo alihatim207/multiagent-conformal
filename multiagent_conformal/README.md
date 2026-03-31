@@ -1,6 +1,6 @@
 # Conformal Navigation: Multi-Agent Uncertainty Demo
 
-A prototype demonstrating **conformal prediction** applied to **multi-agent navigation** under uncertainty. Built as a research exploration project ahead of a meeting with Jake Gonzales (UW ECE, CTRL Lab).
+A prototype demonstrating **conformal prediction** applied to **multi-agent navigation** under uncertainty.
 
 ## What It Does
 
@@ -84,12 +84,6 @@ Use the **α slider** to change the coverage target and see how prediction set s
 | 0.05 | 95% | ~27 cells |
 
 Lower α = larger sets = stronger guarantee. The right α depends on the application's tolerance for risk.
-
-## Related Work
-
-This prototype is inspired by:
-- Gonzales et al., *Safe Probabilistic Planning for Human-Robot Interaction using Conformal Risk Control*, IROS 2025
-- Angelopoulos & Bates, *A Gentle Introduction to Conformal Prediction and Distribution-Free Uncertainty Quantification*, 2021
 
 ## Author
 
